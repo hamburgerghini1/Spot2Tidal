@@ -89,13 +89,13 @@ def import_to_tidal(tracks, playlist_name):
             print(f"🔍 Searching: {query}")
             
             try:
-                # Search for track on Tidal
-                search_results = session.search(query, models=[tidalapi.media.Track])
+                # Search for track on Tidal using search_tracks instead of search
+                tracks_found = session.search_tracks(query)
                 
-                if search_results.tracks and len(search_results.tracks) > 0:
+                if tracks_found:
                     # Find best match
                     best_match = None
-                    for track in search_results.tracks:
+                    for track in tracks_found:
                         if (track.name.lower() == t['title'].lower() and 
                             any(artist.name.lower() == t['artist'].lower() 
                                 for artist in track.artists)):
@@ -103,9 +103,19 @@ def import_to_tidal(tracks, playlist_name):
                             break
                     
                     if best_match:
-                        playlist.add([best_match])
-                        success_count += 1
-                        print(f"   ✅ Added: {t['title']} by {t['artist']}")
+                        # Add track to playlist using track ID
+                        try:
+                            playlist.add_track(best_match.id)
+                            success_count += 1
+                            print(f"   ✅ Added: {t['title']} by {t['artist']}")
+                        except Exception as add_error:
+                            print(f"   ❌ Failed to add track: {add_error}")
+                            missing_tracks.append({
+                                'title': t['title'],
+                                'artist': t['all_artists'],
+                                'album': t['album'],
+                                'reason': f'Failed to add: {str(add_error)}'
+                            })
                     else:
                         print(f"   ❌ No exact match found: {query}")
                         missing_tracks.append({
@@ -115,13 +125,14 @@ def import_to_tidal(tracks, playlist_name):
                             'reason': 'No exact match found'
                         })
                 else:
-                    print(f"   ❌ Not found: {query}")
+                    print(f"   ❌ No results found: {query}")
                     missing_tracks.append({
                         'title': t['title'],
                         'artist': t['all_artists'],
                         'album': t['album'],
-                        'reason': 'Not found in Tidal'
+                        'reason': 'No search results'
                     })
+                    
             except Exception as e:
                 print(f"   ❌ Error processing {query}: {e}")
                 missing_tracks.append({
